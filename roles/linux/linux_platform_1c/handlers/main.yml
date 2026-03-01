@@ -1,0 +1,8 @@
+---
+- name: reboot_serv
+  reboot:
+
+- name: restart_ras
+  ansible.builtin.service:
+    name:  ras-{{ version_url }}
+    state: restarted

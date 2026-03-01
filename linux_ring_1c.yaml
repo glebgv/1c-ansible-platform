@@ -1,0 +1,17 @@
+# Установка утилиты RING для Linux
+# Она нужна для работы шаблонов Zabbix
+
+---
+- name: Установка RING на Linux
+  hosts: all
+  gather_facts: yes
+  become: true
+
+  pre_tasks:
+    - name: Проверка, что система Linux
+      fail:
+        msg: "Этот плейбук предназначен только для Linux систем."
+      when: ansible_os_family != "Debian" and ansible_os_family != "RedHat"
+
+  roles:
+    - linux/linux_ring_1c

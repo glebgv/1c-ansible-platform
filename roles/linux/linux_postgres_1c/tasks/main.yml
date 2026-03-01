@@ -1,0 +1,90 @@
+---
+    - name: Устанавливаем локали
+      community.general.locale_gen:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - en_US.UTF-8
+        - ru_RU.UTF-8
+
+
+    - name: Устанавливаем локаль языка системы
+      shell: sudo update-locale LANG=ru_RU.UTF8
+
+
+    - name: Выставляем временную зону
+      community.general.timezone:
+        name: Europe/Moscow
+
+    - name: Открываем порт на firewall
+      community.general.ufw:
+        rule: allow
+        port: 5432
+        proto: tcp
+        src: "{{ local_ip }}"
+
+
+    - name: Добавление репозитория
+      apt_repository:
+        repo: deb [trusted=yes] http://repo.postgrespro.ru/1c/1c-15/ubuntu jammy main
+        state: present
+
+    - name: Установка
+      ansible.builtin.apt:
+        name: postgrespro-1c-15
+        state: latest
+        update_cache: yes
+      
+    - name: Перезагрузка службу
+      ansible.builtin.service:
+        name: postgrespro-1c-15
+        state: stopped
+
+
+    - name: Удаляем папку data по умолчанию
+      ansible.builtin.file:
+        path: /var/lib/pgpro/1c-15/data
+        state: absent
+
+        # - restart_postgre
+    - name: Создаем директорию в /data
+      ansible.builtin.file:
+        path: /data/postgre
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+
+    - name: Замена пути /data
+      ansible.builtin.lineinfile:
+        path: /etc/default/postgrespro-1c-15
+        regexp: 'PGDATA=*'
+        line: 'PGDATA=/data/postgre'
+
+    - name: Настраиваем postgres
+      shell: sudo /opt/pgpro/1c-15/bin/pg-setup initdb --tune=1c --locale=ru_RU.UTF-8
+
+    - name: Перезапуск службы
+      ansible.builtin.service:
+        name: postgrespro-1c-15
+        state: started
+
+    - name: Выставляем права на /data
+      ansible.builtin.file:
+        path: /data
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+
+    - name: Создание юзера в базе postgres с паролем
+      shell: sudo -u postgres psql -U postgres -c "alter user postgres with password '{{postgre_pass_var}}';"
+      tags:
+        pass
+        # Выбрано решение через shell, так как  community.postgresql.postgresql_user требует наличия на удаленном хосте :
+
+    - name: Удаляем папку data по умолчанию
+      ansible.builtin.file:
+        path: /var/lib/pgpro/1c-15/data
+        state: absent

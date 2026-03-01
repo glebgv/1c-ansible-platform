@@ -1,0 +1,39 @@
+---
+- name: Скачивание RING
+  get_url:
+    url: https://disk.marstel.ru/index.php/s/7fz9jBseHQr7maA/download/1c_enterprise_license_tools_0.15.0_2_linux_x86_64.tar.gz
+    dest: /tmp
+
+- name: "Поиск скаченного архива в /tmp"
+  find:
+    paths: "/tmp"
+    patterns: '1c_enterprise_license_tools*'
+  register: tools_found
+
+- name: Распаковка архива RING
+  unarchive:
+    src: "{{ tools_found.files | map(attribute='path') | join('') }}"
+    dest: /tmp
+    remote_src: True
+
+- name: Установка пакета default-jre
+  apt:
+    name: default-jre
+    state: present
+
+- name: Установка RING
+  shell: cd /tmp && sudo ./1ce-installer-cli install --ignore-signature-warnings
+
+- name: Загрузка обновленные переменные среды и запуск ring
+  shell: "bash -c 'source /etc/profile.d/1ce.sh && ring'"
+  become: false
+  register: program_output
+  ignore_errors: yes
+
+- name: Проверка успешности запуска
+  assert:
+    that: 
+      - program_output is success
+    fail_msg: "Программа не запускается"
+  become: false
+  

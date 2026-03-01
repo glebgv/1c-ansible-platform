@@ -1,0 +1,93 @@
+---
+    - name: Скачивание платформы
+      get_url:
+        url: "{{ url_platform_linux }}"
+        dest: /tmp
+    - name: "Get list of backup files"
+      find:
+        paths: "/tmp"
+        patterns: 'server64_*'
+      register: platform_found
+
+    - name: Установка пакета unzip
+      ansible.builtin.package:
+        name: unzip
+        state: present
+
+    - name: Распаковка архива
+      unarchive:
+        src: "{{ platform_found['files'] | map(attribute='path') | join('') }}"
+        dest: /tmp
+        remote_src: True
+
+
+          #    - name: Распаковка архива tar.gz
+          #  shell: "tar -xzf {{ platform_found['files'] | map(attribute='path') | join('') }} -C /tmp"
+          #    args:
+          #        chdir: /tmp
+
+
+    - name: Удаляем архив
+      ansible.builtin.file:
+        path: "{{ platform_found['files'] | map(attribute='path') | join('') }}"
+        state: absent      
+
+    - name: Поиск файла установки
+      find:
+        paths: "/tmp"
+        patterns: '*setup-full*'
+      register: setup_full
+
+    - name: Установка платформы
+      shell: cd /tmp && sudo ./{{ platform }} --mode unattended --enable-components server,liberica_jre,ws,server_admin,ru --disable-components client_full
+
+    - name: Создание папки 1clogs
+      ansible.builtin.file:
+        path: /data/1clogs
+        state: directory
+        mode: '0755'
+        owner: usr1cv8
+        group: grp1cv8
+
+    - name: Создание симлинка на службу srv1cv8
+      file:
+        src: "/opt/1cv8/x86_64/{{ version_url }}/srv1cv8-{{ version_url }}@.service"
+        dest: "/etc/systemd/system/srv1cv8-{{ version_url }}@.service"
+        state: link
+
+    - name: Замена пути на /data/1clogs
+      lineinfile:
+        path: /opt/1cv8/x86_64/{{ version_url }}/srv1cv8-{{ version_url }}@.service
+        regexp: 'Environment=SRV1CV8_DATA=/home/usr1cv8/.1cv8/1C/1cv8'
+        line: 'Environment=SRV1CV8_DATA=/data/1clogs'
+        backrefs: yes
+
+    - name: Enable службы srv1cv8
+      ansible.builtin.service:
+        name: srv1cv8-{{ version_url }}@.service
+        enabled: yes
+
+
+    - name: Добавление правил в фаервол
+      community.general.ufw:
+        rule: allow
+        port: "1540,1541,1545,1560:1591"
+        proto: tcp
+        src: "{{ local_subnet }}"
+      when: local_subnet is defined
+
+    - name: Добавление шрифтов Windows
+      shell: 'echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections'
+      # when: not platform_installed
+
+    - name: Добавление шрифтов Windows
+      ansible.builtin.apt:
+        name: "{{ item }}"
+      loop:
+        - ttf-mscorefonts-installer
+        - fontconfig
+      # when: not platform_installed
+
+    - name: Очистка кэша
+      shell: sudo fc-cache –fv
+      # when: not platform_installed

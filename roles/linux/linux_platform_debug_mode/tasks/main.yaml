@@ -1,0 +1,59 @@
+---
+- name: Gather service facts
+  service_facts:
+
+- name: Convert debug_mode to boolean
+  set_fact:
+    debug_mode_bool: "{{ debug_mode | bool }}"
+
+- name: Find active 1C server service
+  systemd:
+    name: "{{ item }}"
+    state: started
+  loop: "{{ ansible_facts.services | select('match', '^srv1cv8.*default\\.service$') | list }}"
+  register: found_srv1cv8
+
+- name: Set service name fact
+  set_fact:
+    service_name: "{{ found_srv1cv8.results | map(attribute='item') | list | first }}"
+  when: found_srv1cv8.results | length > 0
+
+- name: Handle case when no service is found
+  set_fact:
+    service_name: null
+  when: found_srv1cv8.results | length == 0
+
+- name: Find unit file for the service
+  command: systemctl show -p FragmentPath "{{ service_name }}"
+  register: unit_file_path
+  changed_when: false
+  when: service_name is not none
+
+- name: Extract unit file path
+  set_fact:
+    service_file: "{{ unit_file_path.stdout.split('=')[1] }}"
+  when: unit_file_path.stdout is defined
+
+- name: Set debug mode in service file
+  lineinfile:
+    path: "{{ service_file }}"
+    regexp: '^Environment=SRV1CV8_DEBUG='
+    line: "Environment=SRV1CV8_DEBUG={{ '-debug' if debug_mode_bool else '' }}"
+    state: present
+  when: service_file is defined
+
+- name: Reload systemd daemon
+  command: systemctl daemon-reload
+  when: service_file is defined
+
+- name: Restart 1C server service
+  systemd:
+    name: "{{ service_name }}"
+    state: restarted
+    enabled: yes
+  when: service_name is not none
+
+- name: Notify if no service is found
+  debug:
+    msg: "No active srv1cv8 service found on the system."
+  when: service_name is none

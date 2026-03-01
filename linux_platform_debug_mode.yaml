@@ -1,0 +1,20 @@
+# Плейбук для ключения и выключения -debug для службы 1с.
+# Выполняет стоп службы, прописывает ключ, daemon reload и выполняет запуск.
+# Алтернатива утилите marstool.
+
+---
+- name: Включение debug mode для платформы linux на сервер
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Проверка, что система Linux
+      fail:
+        msg: "Этот плейбук предназначен только для Linux систем."
+      when: ansible_os_family != "Debian" and ansible_os_family != "RedHat"
+
+  roles:
+    - linux/linux_platform_debug_mode

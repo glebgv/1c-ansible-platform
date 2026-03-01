@@ -1,0 +1,21 @@
+---
+- name: Деактивация службы по имени "srv1cv8.*"
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop: "{{ ansible_facts.services | select('match', '^srv1cv8.*default\\.service$') | list }}"
+  ignore_errors: yes
+
+- name: Деактивация службы по имени "ras.*"
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop: "{{ ansible_facts.services | select('match', '^ras.*$') | list }}"
+  ignore_errors: yes
+
+- name: Удаляем симлинк rac
+  file:
+    path: /opt/1cv8/bin/rac
+    state: absent

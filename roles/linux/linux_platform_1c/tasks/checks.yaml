@@ -1,0 +1,63 @@
+---
+- name: Проверка расширения файла в URL
+  fail:
+    msg: "URL не содержит расширения файла .zip или .tar.gz"
+  when: not (url_platform_linux is match(".*\\.(zip|tar\\.gz)$"))
+
+- name: Извлечь версию из URL
+  set_fact:
+    #version_url: "{{ url_platform | regex_replace('.*server64_with_all_clients_([0-9_.]+)\\.tar\\.gz.*', '\\1') |  replace('_', '.') }}"
+    #version_url: "{{ url_platform | regex_replace('.*server64_with_all_clients_([0-9_.]+)\\.zip.*', '\\1') |  replace('_', '.') }}"
+    #version_url: "{{ url_platform | regex_replace('.*server64_([0-9_.]+)\\.zip.*', '\\1') |  replace('_', '.') }}"
+    version_url: "{{ url_platform_linux | regex_replace('.*(server64(_with_all_clients)?_([0-9_.]+)\\.zip).*', '\\3') | replace('_', '.') }}"
+    
+    ### Проверка, что на удаленном хосте хватает места в корне, перед загрузкой  архива платформы. 
+- name: Проверка места на сервере
+  set_fact:
+    check_space: "{{ ansible_mounts[0].size_available | int / 1024 ** 3 > 4 }}"
+
+- name: Прерывание, если места недостаточно
+  block:
+    - name: Прерывание
+      debug:
+        msg: "На сервере недостаточно места для установки"
+    - name: Прерывание выполнено
+      meta: end_play
+  when: not check_space 
+
+- name: Gather Service Facts
+  service_facts:
+
+### Проверка, есть ли уже платформа на сервере по наличию службы
+- name: Поиск запущенной службы по шаблону "srv1cv8.*"
+  systemd:
+    name: "{{ item }}"
+    state: started
+  loop: "{{ ansible_facts.services | select('match', '^srv1cv8.*default\\.service$') | list }}"
+  register: found_srv1cv8
+
+- set_fact:
+    srv1cv8_check: "{{ found_srv1cv8.results | length > 0 }}"
+
+### Проверка уже установленной платформы 1с
+- name: Прохождение проверки
+  block:
+    - name: Извлечь версию из найденных имен служб
+      set_fact:
+        version: "{{ found_srv1cv8.results[0].item | regex_replace('.*-([0-9.]+)@.*', '\\1') }}"
+
+    - name: Сравнить версии и записываем в version_compare
+      set_fact:
+        version_compare: "{{ version == version_url }}"
+    
+### Прерываем выполнение плейбука, если мы пытаемся поставить версию платформы, которая уже есть на сервере
+    - block:
+        - name: Проверить, если версии совпадают
+          debug:
+            msg: "Такая версия уже есть на сервере"
+          when: version_compare
+
+        - name: Прервать выполнение плейбука, если версии совпадают
+          meta: end_play
+      when: version_compare
+  when: srv1cv8_check

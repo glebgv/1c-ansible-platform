@@ -1,0 +1,23 @@
+---
+### Запуск плейбуков
+- name: "Проверки перед установкой"
+  ansible.builtin.include_tasks:
+    file: checks.yaml
+
+- name: "Деактивация найденных служб"
+  ansible.builtin.include_tasks:
+    file: deactivate_old_platform.yaml
+  when: srv1cv8_check
+
+- name: "Установка платформы"
+  ansible.builtin.include_tasks:
+    file: install_platform.yaml
+
+- name: "Установка RAS"
+  ansible.builtin.include_tasks:
+    file: install_ras.yaml
+
+- name: "Настройка технологического журнала"
+  ansible.builtin.include_tasks:
+    file: setup_tech_journal.yaml
+  # when: not srv1cv8_check

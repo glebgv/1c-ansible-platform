@@ -1,0 +1,33 @@
+---
+    - name: Создаем каталог bin
+      ansible.builtin.file:
+        path: /opt/1cv8/bin
+        state: directory
+
+    - name: Создаем симлинк службы RAC
+      file:
+        src: "/opt/1cv8/x86_64/{{ version_url }}/rac"
+        dest: "/opt/1cv8/bin/rac"
+        state: link
+
+
+    - name: Добавляем в ENV
+      lineinfile:
+        path: /etc/environment
+        regexp: 'PATH=(["])((?!.*?{{ env_path_rac }}).*?)(["])$'
+        line: 'PATH=\1\2:{{ env_path_rac }}\3'
+        backrefs: yes
+
+    - name: Создаем симлинк службы RAS
+      file:
+        src: "/opt/1cv8/x86_64/{{ version_url }}/ras-{{ version_url }}.service"
+        dest: "/etc/systemd/system/ras-{{ version_url }}.service"
+        state: link
+
+    - name: Enable service RAS
+      ansible.builtin.service:
+        name: ras-{{ version_url }}.service
+        enabled: yes
+      notify:
+        - restart_ras
+        - reboot_serv

@@ -1,0 +1,32 @@
+---
+    - name: Создаем файл конфига
+      copy:
+        src: logcfg.xml
+        dest: "{{ logcfg_path }}"
+
+
+    - name: Создание каталогов
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - /var/log/1c/logs/excp
+        - /var/log/1c/logs/vrs
+        - /var/log/1c/logs/dumps
+
+
+    - name: Выставляем права
+      ansible.builtin.file:
+        path: /var/log/1c
+        state: directory
+        recurse: yes
+        owner: usr1cv8
+        group: grp1cv8
+
+    - name: Выставляем права на файл
+      ansible.builtin.file:
+        path: "{{ logcfg_path }}"
+        owner: usr1cv8
+        group: grp1cv8
+        mode: '0755'
+
